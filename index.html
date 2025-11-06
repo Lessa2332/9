@@ -98,18 +98,16 @@
   </div>
 </div>
 <script>
-// Динамічне завантаження з fallback
 async function loadScript(src, fallbackSrc = null) {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = src;
-    script.type = 'module';  // ФІКС: Для ES modules Three.js
+    // ФІКС: Без type='module' для глобального scope
     script.onload = () => resolve(script);
     script.onerror = () => {
       if (fallbackSrc) {
         const fallback = document.createElement('script');
         fallback.src = fallbackSrc;
-        fallback.type = 'module';
         fallback.onload = () => resolve(fallback);
         fallback.onerror = () => reject(new Error(`Failed to load ${src} and fallback`));
         document.head.appendChild(fallback);
@@ -124,16 +122,20 @@ async function loadScript(src, fallbackSrc = null) {
 async function initApp() {
   try {
     await Promise.all([
-      loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js'),  // ФІКС: Явна версія MediaPipe
+      loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js'),  // ФІКС: Без версії — latest
       loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js'),
-      loadScript('https://cdn.jsdelivr.net/npm/three@0.181.0/build/three.module.js'),  // ФІКС: module.js — без deprecation
+      loadScript('https://cdn.jsdelivr.net/npm/three@0.181.0/build/three.min.js'),  // ФІКС: min.js — глобальний
       loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js')
     ]);
     
-    if (typeof Pose === 'undefined' || typeof THREE === 'undefined') {
-      throw new Error('Libraries failed to load. Check connection or AdBlock.');
+    // ФІКС: Детальна перевірка
+    if (typeof Pose === 'undefined') {
+      throw new Error('MediaPipe Pose not loaded (check AdBlock/CDN).');
     }
-    console.log('All libraries loaded successfully!');
+    if (typeof THREE === 'undefined') {
+      throw new Error('Three.js not loaded (check AdBlock/CDN).');
+    }
+    console.log('All libraries loaded successfully! Pose:', typeof Pose, 'THREE:', typeof THREE);
 
     const sockPNGs = ['sock1.png', 'sock2.png', 'sock3.png'];
     const video = document.getElementById('camera');
@@ -235,7 +237,7 @@ async function initApp() {
       return { x: nx * (window.innerWidth / window.innerHeight), y: ny };
     }
 
-    // ФІКС: new Pose(...) замість new Pose.Pose(...)
+    // ФІКС: new Pose({ ... }) — правильний конструктор
     const pose = new Pose({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
     });
@@ -277,7 +279,7 @@ async function initApp() {
       renderer.render(scene, camera3);
       
       if (results.poseLandmarks) {
-        console.log('Pose detected!');  // Дебаг: видали після тесту
+        console.log('Pose detected!');  // Дебаг
         const L = results.poseLandmarks;
         const leftAnkle = L[27];
         const rightAnkle = L[28];
@@ -320,7 +322,7 @@ async function initApp() {
       }
     }
 
-    // Кнопки (без змін)
+    // Кнопки, сніг, animate, renderLoop — без змін (скопіюй з попереднього)
     document.getElementById('changeBtn').addEventListener('click', () => {
       currentDesign = (currentDesign + 1) % designsCount;
       loadDesign(currentDesign);
@@ -461,8 +463,8 @@ async function initApp() {
     }, 1000);
     
   } catch (err) {
-    console.error('Init error:', err);
-    alert('Помилка завантаження: ' + err.message + '\nВимкни AdBlock або перевір інтернет.');
+    console.error('Init error details:', err);  // ФІКС: Детальний лог
+    alert('Помилка завантаження: ' + err.message + '\nДеталі в консолі (F12). Вимкни AdBlock.');
   }
 }
 
